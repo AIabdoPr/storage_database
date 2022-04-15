@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:convert';
 
 import './storage_database.dart';
 import 'src/storage_database_excption.dart';
@@ -32,9 +31,7 @@ class StorageCollection {
               ? []
               : null;
     } else {
-      dynamic collectionData = jsonDecode(
-        storageDatabase.source.getData(collectionId)!,
-      );
+      dynamic collectionData = storageDatabase.source.getData(collectionId);
       bool currectType = false;
       try {
         if (dataType.toString().contains("Map")) {
@@ -60,10 +57,16 @@ class StorageCollection {
 
   set(var data, {bool log = true, bool keepData = true}) {
     dynamic collectionData = checkType(data.runtimeType);
-    if (keepData &&
-        (data.runtimeType.toString().contains("Map") ||
-            data.runtimeType.toString().contains("List"))) {
-      collectionData.addAll(data);
+    if (keepData && data.runtimeType.toString().contains("Map")) {
+      for (var key in data.keys) {
+        collectionData[key] = data[key];
+      }
+    } else if (keepData && data.runtimeType.toString().contains("List")) {
+      for (var item in data) {
+        if (!collectionData.contains(item)) {
+          collectionData.add(item);
+        }
+      }
     } else {
       collectionData = data;
     }
@@ -72,14 +75,14 @@ class StorageCollection {
     }
     storageDatabase.source.setData(
       collectionId,
-      jsonEncode(collectionData),
+      collectionData,
     );
   }
 
   dynamic get({bool log = true}) {
     if (!storageDatabase.checkCollectionIdExists(collectionId)) {
       throw StorageDatabaseException(
-        "This collection has not yet been created",
+        "This collection ($collectionId) has not yet been created",
       );
     }
     dynamic collectionData = storageDatabase.source.getData(collectionId);
@@ -91,23 +94,23 @@ class StorageCollection {
 
   String getPath() => collectionId;
 
-  bool hasDocumentId(String documentId) {
+  bool hasDocumentId(dynamic documentId) {
     try {
       return Map.from(get()).containsKey(documentId);
     } catch (e) {
       print("has id: $e");
       throw StorageDatabaseException(
-        "This Collection does not support documents",
+        "This Collection ($collectionId) does not support documents",
       );
     }
   }
 
-  Stream stream() async* {
+  Stream stream({delayCheck = const Duration(milliseconds: 50)}) async* {
     storageListeners.initStream(getPath());
     while (true) {
-      await Future.delayed(const Duration(milliseconds: 200));
+      await Future.delayed(delayCheck);
       Map dates = storageListeners.getDates(getPath());
-      if (dates["set_date"] > dates["get_date"]) {
+      if (dates["set_date"] >= dates["get_date"]) {
         yield get();
       }
     }
@@ -122,21 +125,28 @@ class StorageCollection {
     set(collectionData, keepData: false);
   }
 
-  StorageDocument document(String docId) {
+  StorageDocument document(dynamic docId) {
     if (!storageDatabase.checkCollectionIdExists(collectionId)) {
       storageDatabase.source.setData(collectionId, {});
     }
     try {
       Map.from(get());
     } catch (e) {
-      print("document error $e");
+      print("document error: $e");
       throw StorageDatabaseException(
         "This collection($collectionId) doesn't support documents",
       );
     }
-    List<String> docIds = docId.split("/");
+    List docIds = docId.runtimeType == String ? docId.split("/") : [docId];
+
     StorageDocument document = StorageDocument(
-        storageDatabase, this, true, collectionId, docIds[0], storageListeners);
+      storageDatabase,
+      this,
+      true,
+      collectionId,
+      docIds[0],
+      storageListeners,
+    );
     for (int i = 1; i < docIds.length; i++) {
       document.set({docIds[i - 1]: {}});
       document = document.document(docIds[i]);
@@ -151,7 +161,7 @@ class StorageCollection {
       docsIds = data.keys.toList();
     } else {
       throw StorageDatabaseException(
-        "This collection does not support documents",
+        "This collection ($collectionId) does not support documents",
       );
     }
     Map<String, StorageDocument> docs = {};

@@ -36,16 +36,22 @@ class StorageListeners {
     setListenersData(listenersData);
   }
 
-  setDate(String streamId) {
+  int setDate(String streamId, {int? microseconds}) {
     Map listenersData = getListenersData();
-    listenersData[streamId]["set_date"] = DateTime.now().millisecondsSinceEpoch;
+    int microsecondsSinceEpoch =
+        microseconds ?? DateTime.now().microsecondsSinceEpoch;
+    listenersData[streamId]["set_date"] = microsecondsSinceEpoch;
     setListenersData(listenersData);
+    return microsecondsSinceEpoch;
   }
 
-  getDate(String streamId) {
+  int getDate(String streamId, {int? microseconds}) {
     Map listenersData = getListenersData();
-    listenersData[streamId]["get_date"] = DateTime.now().millisecondsSinceEpoch;
+    int microsecondsSinceEpoch =
+        microseconds ?? DateTime.now().microsecondsSinceEpoch;
+    listenersData[streamId]["get_date"] = microsecondsSinceEpoch;
     setListenersData(listenersData);
+    return microsecondsSinceEpoch;
   }
 
   Map getDates(String streamId) => getListenersData()[streamId];

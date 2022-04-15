@@ -5,9 +5,12 @@ import './storage_collection.dart';
 import 'src/storage_database_excption.dart';
 import 'src/storage_database_source.dart';
 import './storage_document.dart';
+import 'storage_explorer/storage_explorer.dart';
 
 class StorageDatabase {
   final StorageDatabaseSource source;
+  StorageExplorer? explorer;
+  List<Function> onClear = [];
 
   StorageDatabase(this.source);
 
@@ -18,13 +21,15 @@ class StorageDatabase {
         source ?? await DefualtStorageSource.getInstance(),
       );
 
-  StorageCollection collection(String collectionId) {
-    return StorageCollection(this, collectionId);
-  }
+  Future initExplorer() async =>
+      explorer = await StorageExplorer.getInstance(this);
+
+  StorageCollection collection(String collectionId) =>
+      StorageCollection(this, collectionId);
 
   StorageDocument document(String documentPath) {
     if (!documentPath.contains("/")) {
-      throw StorageDatabaseException(
+      throw const StorageDatabaseException(
         "Incorrect document path, ex: 'collection/doc/docChild'",
       );
     }
@@ -43,5 +48,14 @@ class StorageDatabase {
     return source.containsKey(collectionId);
   }
 
-  Future<bool> clear() async => await source.clear();
+  Future clear() async {
+    if (explorer != null) {
+      await explorer!.clear();
+    }
+    await source.clear();
+
+    for (Function onClearFunc in onClear) {
+      onClearFunc();
+    }
+  }
 }
